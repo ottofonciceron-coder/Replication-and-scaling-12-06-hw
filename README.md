@@ -135,7 +135,7 @@ graph TB
 ```
 
 
-```
+```mermaid
 graph LR
     subgraph Users_Shards["users - горизонтальные шарды"]
         Shard1[Shard 1<br/>user_id: 1 – 1,000,000<br/>Master + Slave]

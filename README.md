@@ -133,7 +133,14 @@ graph TB
     Router --> Vertical3
 
 ```
+```
+## Тест Mermaid
 
+```mermaid
+graph LR
+    A[Master] --> B[Slave]
+```
+```
 
 ```
 mermaid

@@ -81,156 +81,21 @@ SELECT * FROM actor WHERE first_name = 'REPLICA';
 
 ### Задание 2 Разработайте план для выполнения горизонтального и вертикального шаринга базы данных. База данных состоит из трёх таблиц.Опишите принципы построения системы и их разграничение или разбивку между базами данных.
 
-### Принципы построения:
+1. `Архитектура системы`
+2. `Полная комбинированная схема`
 
+![zadanie2](https://github.com/ottofonciceron-coder/Replication-and-scaling-12-06-hw/blob/main/Архитектура%20системы.png)`
+
+![zadanie2](https://github.com/ottofonciceron-coder/Replication-and-scaling-12-06-hw/blob/main/Полная%20%20схема.png)`
 
 1. `Вертикальный шардинг - Разделение таблиц по функциональному назначению (users, books, stores).Плюсы - Простота масштабирования, изоляция нагрузки, безопасность.Минусы - Сложность JOIN-запросов между БД`
 2. `Горизонтальный шардинг - Разделение таблиц по ключу: users > user_id, books > genre + book_id, stores > region.Плюсы - Равномерное распределение данных, линейное масштабирование.Минусы- Сложность транзакций между шардами`
-3. `Выполним запрос на продолжительность которых больше средней продолжительности всех фильмов`
+3. `Комбинированный подход - Система использует двухуровневое разделение данных.Первый уровень — вертикальный шардинг (разделение по доменам).Второй уровень — горизонтальный шардинг внутри каждого домена`
 
-### План горизонтального и вертикального шардинга.
-
-```
-graph TB
-    subgraph Clients["Клиенты / Приложения"]
-        API[API Gateway]
-    end
-
-    subgraph Router["Shard Router Layer"]
-        RouterLogic[Маршрутизатор запросов<br/>Определение шарда по ключу]
-    end
-
-    subgraph Vertical1["Вертикальный шард: DB_Auth"]
-        direction TB
-        AuthMaster[Master Server<br/>port 3306<br/>Read-Write]
-        AuthSlave1[Slave Replica 1<br/>Read-Only]
-        AuthSlave2[Slave Replica 2<br/>Read-Only]
-        AuthMaster --> AuthSlave1
-        AuthMaster --> AuthSlave2
-    end
-
-    subgraph Vertical2["Вертикальный шард: DB_Catalog"]
-        direction TB
-        CatalogMaster[Master Server<br/>port 3306<br/>Read-Write]
-        CatalogSlave1[Slave Replica 1<br/>Read-Only]
-        CatalogSlave2[Slave Replica 2<br/>Read-Only]
-        CatalogMaster --> CatalogSlave1
-        CatalogMaster --> CatalogSlave2
-    end
-
-    subgraph Vertical3["Вертикальный шард: DB_Commerce"]
-        direction TB
-        CommerceMaster[Master Server<br/>port 3306<br/>Read-Write]
-        CommerceSlave1[Slave Replica 1<br/>Read-Only]
-        CommerceSlave2[Slave Replica 2<br/>Read-Only]
-        CommerceMaster --> CommerceSlave1
-        CommerceMaster --> CommerceSlave2
-    end
-
-    Clients --> Router
-    Router --> Vertical1
-    Router --> Vertical2
-    Router --> Vertical3
-
-```
-```
-## Тест Mermaid
-
-```mermaid
-graph LR
-    A[Master] --> B[Slave]
-```
-```
-
-```
-mermaid
-graph LR
-    subgraph Users_Shards["users - горизонтальные шарды"]
-        Shard1[Shard 1<br/>user_id: 1 – 1,000,000<br/>Master + Slave]
-        Shard2[Shard 2<br/>user_id: 1,000,001 – 2,000,000<br/>Master + Slave]
-        Shard3[Shard 3<br/>user_id: 2,000,001 – 3,000,000<br/>Master + Slave]
-        ShardN[Shard N<br/>user_id: > 3,000,000<br/>Master + Slave]
-    end
-    
-    RouterUsers[Router: hash(user_id) % N] --> Shard1
-    RouterUsers --> Shard2
-    RouterUsers --> Shard3
-    RouterUsers --> ShardN
-
-```
-
-```
-#Таблица books
-
-graph LR
-    subgraph Books_Shards["books - горизонтальные шарды"]
-        Fiction[Shard Fiction<br/>genre: Fiction, Fantasy<br/>book_id: 1-500K]
-        Mystery[Shard Mystery<br/>genre: Mystery, Thriller<br/>book_id: 1-500K]
-        Science[Shard Science<br/>genre: Science, Technical<br/>book_id: 1-500K]
-        Other[Shard Other<br/>other genres<br/>book_id: all ranges]
-    end
-    
-    RouterBooks[Router: genre + book_id] --> Fiction
-    RouterBooks --> Mystery
-    RouterBooks --> Science
-    RouterBooks --> Other
-
-```
-
-```
-#Таблица stores
-
-graph LR
-    subgraph Stores_Shards["stores - горизонтальные шарды"]
-        NA[Shard NA<br/>region: North America<br/>Master + Slave]
-        EU[Shard EU<br/>region: Europe<br/>Master + Slave]
-        Asia[Shard Asia<br/>region: Asia<br/>Master + Slave]
-        Other[Shard Other<br/>region: other<br/>Master + Slave]
-    end
-    
-    RouterStores[Router: region] --> NA
-    RouterStores --> EU
-    RouterStores --> Asia
-    RouterStores --> Other
-
-```
-
-```
-#Полная комбинированная схема
-
-flowchart TB
-    subgraph API["Application Layer"]
-        LB[Load Balancer]
-        Router[Shard Router<br/>Middleware]
-    end
-
-    subgraph Auth["DB_Auth (users)"]
-        direction LR
-        A1[users_shard_1<br/>ID: 1-1M<br/>Master+Slave]
-        A2[users_shard_2<br/>ID: 1M-2M<br/>Master+Slave]
-        A3[users_shard_3<br/>ID: 2M-3M<br/>Master+Slave]
-    end
-
-    subgraph Catalog["DB_Catalog (books)"]
-        direction LR
-        B1[books_shard_1<br/>Fiction<br/>Master+Slave]
-        B2[books_shard_2<br/>Mystery<br/>Master+Slave]
-        B3[books_shard_3<br/>Science<br/>Master+Slave]
-    end
-
-    subgraph Commerce["DB_Commerce (stores)"]
-        direction LR
-        S1[stores_shard_1<br/>North America<br/>Master+Slave]
-        S2[stores_shard_2<br/>Europe<br/>Master+Slave]
-        S3[stores_shard_3<br/>Asia<br/>Master+Slave]
-    end
-
-    LB --> Router
-    Router -->|user_id| Auth
-    Router -->|genre + book_id| Catalog
-    Router -->|region| Commerce
-
-```
+### 3 В каких режимах будут работать сервера.
+1. `Master (Read-Write) + Slave (Read-Only) внутри каждого шарда`
+2. `Master - Read-Write - Принимает запросы на запись (INSERT, UPDATE, DELETE) и чтение`
+3. `Slave	- Read-Only - Принимает только запросы на чтение (SELECT), получает данные с Master через репликацию`
 
 ---
 
